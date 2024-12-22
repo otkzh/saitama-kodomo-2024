@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>こども食堂一覧</title>
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+
+<body>
+    <div id="list-page" class="list-container">
+        <!-- List Items (Generated dynamically) -->
+        <div class="header">
+            <h1 id="detail-title">こども食堂つなぐマップ</h1>
+        </div>
+    </div>
+
+    <div id="detail-page" style="display: none;">
+        <div class="header">
+            <h1 id="detail-title">こども食堂 詳細</h1>
+        </div>
+        <div id="map" class="detail-map"></div>
+        <div class="list-container">
+            <div class="list-item">
+                <img id="detail-host-icon" class="host-icon" src="" alt="主催者">
+                <div class="content">
+                    <h2 id="detail-name">名称</h2>
+                    <p id="detail-comment">意気込み</p>
+                </div>
+            </div>
+            <table>
+                <tr>
+                    <th>住所</th>
+                    <td id="detail-address"></td>
+                </tr>
+                <tr>
+
+                    <th>開催日</th>
+                    <td id="detail-open"></td>
+                </tr>
+                <tr>
+
+                    <th>参加費</th>
+                    <td id="detail-price">無料</td>
+                </tr>
+            </table>
+            <div id="jisshi"></div>
+            <a href="#" class="back-button" onclick="goBack()">一覧に戻る</a>
+        </div>
+    </div>
+
+    <script>
+        async function fetchData() {
+            // 現在地の緯度経度をgeolocation APIで取得する
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject);
+            });
+
+            // ローカルの./saitama-kodomo.jsonファイルを読み込んで、positionから緯度経度が近い順にソートする
+            const response = await fetch('./saitama-kodomo.json');
+            const data = await response.json();
+
+            data.sort((a, b) => {
+                const distanceA = Math.abs(a["緯度"] - position.coords.latitude) + Math.abs(a["経度"] - position.coords.longitude);
+                const distanceB = Math.abs(b["緯度"] - position.coords.latitude) + Math.abs(b["経度"] - position.coords.longitude);
+                return distanceA - distanceB;
+            });
+            return data;
+        }
+
+        const listPage = document.getElementById('list-page');
+        const detailPage = document.getElementById('detail-page');
+
+        function showDetail(item) {
+            document.getElementById('detail-title').textContent = item["名称"];
+            document.getElementById('detail-name').textContent = item["名称"];
+            document.getElementById('detail-comment').textContent = "";
+            document.getElementById('detail-address').textContent = item["住所"];
+            document.getElementById('detail-host-icon').src = "./kkrn_icon_user_1.png";
+
+            const jisshiHtml = 
+            // item['実施支援の主な区分'] をカンマ区切りで分割して、それぞれの要素に対してdiv要素を生成する
+            item['実施支援の主な区分'].split(',').map((value) => {
+                const div = document.createElement('div');
+                div.textContent = value;
+                return div;
+            });
+            console.log(jisshiHtml);
+            // document.getElementById('jisshi').textContent = item['実施支援の主な区分'];
+            document.getElementById('jisshi').append(...jisshiHtml);
+            document.getElementById('detail-open').textContent = item['開催日'];
+            document.getElementById('detail-price').textContent = item['参加費_小学生'];
+
+            const map = L.map('map').setView([item["緯度"], item["経度"]], 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.jp/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(map);
+            L.marker(
+                [item["緯度"], item["経度"]]
+            ).addTo(map);
+
+            listPage.style.display = 'none';
+            detailPage.style.display = 'block';
+        }
+
+        function goBack() {
+            // ページをリロードする 
+            location.reload();
+
+
+            // detailPage.style.display = 'none';
+            // listPage.style.display = 'block';
+        }
+
+        async function renderList() {
+            const data = await fetchData();
+            console.log(data);
+
+            data.forEach(item => {
+                const listItem = document.createElement('div');
+                listItem.className = 'list-item';
+
+                const typeImage = document.createElement('img');
+                typeImage.src = "./people.webp";
+                typeImage.className = "type-icon";
+                listItem.appendChild(typeImage);
+
+
+                const hostIcon = document.createElement('img');
+                hostIcon.src = "./kkrn_icon_user_1.png";
+                hostIcon.alt = '主催者';
+                hostIcon.className = 'host-icon';
+                listItem.appendChild(hostIcon);
+
+                const content = document.createElement('div');
+                content.className = 'content';
+
+                const name = document.createElement('h2');
+                name.textContent = item["名称"];
+                content.appendChild(name);
+
+                const address = document.createElement('p');
+                address.textContent = item["住所"];
+                content.appendChild(address);
+
+
+                const comments = [
+                    "食事や遊びを通じて、みんなが笑顔になれる最高の集いの場を一緒につくっていきましょう！！"
+                    , "美味しいご飯と楽しい遊び！こどもだけでもOK。待ってるよー。"
+                    , "だれでも気軽に来て楽しめる居場所で、いろいろな人と食事しながら会話が出来るようなこども食堂です。"
+                    , "この場所は誰かの力になれればと思って作りました！"
+                    , "「誰でもどうぞ！」のポトフ食堂。子どもたちの変化や成長がよくわかるみんなの居場所です。一人暮らしのおばあちゃん3人組も毎回忘れずに来て、「美味しかったわー。楽しかったわー。」と帰られます。温かく、美味しい料理でお待ちしています。"
+                    , "みんなでご飯を食べると美味しいよをモットーに活動しています！おやこ広場で保育士スタッフやママスタッフと一緒に遊ぼう！管理栄養士中心とした調理班が作ったお弁当と一緒にお待ちしています。ぜひ、遊びにきてね♪"
+                    , "「みなもとはみんなもと」を目標に日々活動しています！誰でも利用できる居場所づくりを目指します！"
+                    , "ばぁばぁが作る、愛情たっぷりごはんおいでよー子ども食堂ほっぺ"
+
+                ];
+                const comment = document.createElement('p');
+                comment.textContent = comments[Math.floor(Math.random() * comments.length)];
+
+                content.appendChild(comment);
+
+                listItem.appendChild(content);
+
+                listItem.addEventListener('click', () => showDetail(item));
+
+                listPage.appendChild(listItem);
+            });
+        }
+
+        renderList();
+    </script>
+</body>
+
+</html>
